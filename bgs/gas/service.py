@@ -24,6 +24,12 @@ class GasService(LineService):
         """Open the storage inlet."""
 
         self.require("gas.inlet")
+        self.require_order(
+            self.machine.is_at(GasPhase.IDLE.value),
+            "inlet must be closed before it can open again",
+            phase=self.machine.phase,
+        )
+        self.advance(GasPhase.OPEN.value, "inlet opened")
         self.publish(INLET_KIND, {"active": True})
         self.emit("gas.inlet_opened")
         return self.status()
@@ -32,6 +38,12 @@ class GasService(LineService):
         """Close the storage inlet."""
 
         self.require("gas.inlet_close")
+        self.require_order(
+            self.machine.is_at(GasPhase.OPEN.value),
+            "only an open inlet can be closed",
+            phase=self.machine.phase,
+        )
+        self.advance(GasPhase.SEALED.value, "inlet closed")
         self.publish(INLET_KIND, {"active": False})
         self.emit("gas.inlet_closed")
         return self.status()
@@ -39,8 +51,15 @@ class GasService(LineService):
     def store_gas(self, volume_m3: float, pressure_kpa: float) -> dict[str, Any]:
         """Record a stored volume."""
 
-        self.require("gas.store")
+        self.require("gas.store", required_phase=GasPhase.OPEN.value)
         reading = storage_reading(self.context.thresholds, volume_m3, pressure_kpa, self.context.clock.now())
+        if not reading.ok:
+            raise OverLimitError(
+                "stored pressure is above the configured bound",
+                pressure_kpa=pressure_kpa,
+                code=reading.code,
+                limit=reading.limit,
+            )
         self.publish(STORED_KIND, {"active": True, **reading.describe()})
         self.emit("gas.stored", reading.describe())
         return self.status()

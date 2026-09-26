@@ -23,6 +23,9 @@ def inlet_blockers(facts: Mapping[str, bool]) -> tuple[str, ...]:
     """Return every fact that currently keeps the inlet shut."""
 
     blockers: list[str] = []
+    for fact in (VENT_LATCHED, DIGESTER_LATCHED):
+        if facts.get(fact, False):
+            blockers.append(fact)
     return tuple(blockers)
 
 

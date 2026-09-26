@@ -39,12 +39,14 @@ def storage_reading(
 ) -> StorageReading:
     """Check that a stored volume is positive and inside the pressure bound."""
 
+    if volume_m3 <= 0:
+        raise ValidationError("stored volume must be positive", volume_m3=volume_m3)
     verdict = thresholds.evaluate("storage_pressure", pressure_kpa)
     return StorageReading(
         volume_m3=volume_m3,
         pressure_kpa=pressure_kpa,
         tick=tick,
-        ok=True,
-        code="ok",
-        limit=None,
+        ok=verdict.ok,
+        code=verdict.code,
+        limit=verdict.limit,
     )
